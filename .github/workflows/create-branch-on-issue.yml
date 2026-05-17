@@ -1,0 +1,42 @@
+name: Create Branch on Issue Labeled
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create_branch:
+    # Chạy workflow nếu nhãn được gán là 'coding'
+    if: github.event.label.name == 'coding'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Branch
+        run: |
+          # Lấy số thứ tự của issue (ID) và chuyển tiêu đề thành dạng slug (chữ thường, gạch ngang)
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          
+          # Chuẩn hóa tiêu đề: đổi chữ hoa thành chữ thường, thay khoảng trắng/ký tự đặc biệt thành dấu gạch ngang
+          CLEAN_TITLE=$(echo "$ISSUE_TITLE" | iconv -t ascii//TRANSLIT | strtolower | sed -E 's/[^a-zA-Z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+          
+          # Đặt tên branch theo định dạng: issue-[số ID]-[tiêu-đề-chuẩn-hóa]
+          # Ví dụ: issue-42-fix-login-bug
+          BRANCH_NAME="issue-${ISSUE_NUMBER}-${CLEAN_TITLE}"
+          
+          # Giới hạn độ dài tên branch nếu tiêu đề quá dài
+          BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c 1-50)
+          
+          echo "Đang tạo branch: $BRANCH_NAME"
+          
+          # Thực hiện tạo và push branch lên GitHub
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
