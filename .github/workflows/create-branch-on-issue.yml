@@ -6,7 +6,7 @@ on:
 
 jobs:
   create_branch:
-    # Chạy workflow nếu nhãn được gán là 'coding'
+    # Workflow này sẽ chỉ chạy khi nhãn (label) được gán là 'coding'
     if: github.event.label.name == 'coding'
     runs-on: ubuntu-latest
     
@@ -14,28 +14,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create Branch
+      - name: Create and Push Branch
         run: |
-          # Lấy số thứ tự của issue (ID) và chuyển tiêu đề thành dạng slug (chữ thường, gạch ngang)
+          # 1. Lấy số thứ tự của issue (ID) và tiêu đề từ dữ liệu của GitHub gửi về
           ISSUE_NUMBER="${{ github.event.issue.number }}"
           ISSUE_TITLE="${{ github.event.issue.title }}"
           
-          # Chuẩn hóa tiêu đề: đổi chữ hoa thành chữ thường, thay khoảng trắng/ký tự đặc biệt thành dấu gạch ngang
-          CLEAN_TITLE=$(echo "$ISSUE_TITLE" | iconv -t ascii//TRANSLIT | strtolower | sed -E 's/[^a-zA-Z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+          # 2. Làm sạch tiêu đề để làm tên branch chuẩn chỉnh:
+          # - iconv: Loại bỏ dấu tiếng Việt (nếu có) sang dạng không dấu
+          # - tr: Chuyển toàn bộ chữ hoa thành chữ thường (Khắc phục lỗi strtolower cũ)
+          # - sed lần 1: Thay thế tất cả khoảng trắng và ký tự đặc biệt thành dấu gạch ngang (-)
+          # - sed lần 2: Xóa các dấu gạch ngang thừa ở đầu hoặc cuối chuỗi
+          CLEAN_TITLE=$(echo "$ISSUE_TITLE" | iconv -t ascii//TRANSLIT | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-zA-Z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
           
-          # Đặt tên branch theo định dạng: issue-[số ID]-[tiêu-đề-chuẩn-hóa]
-          # Ví dụ: issue-42-fix-login-bug
+          # 3. Định dạng tên branch theo cấu trúc: issue-[ID]-[tiêu-đề-slug]
           BRANCH_NAME="issue-${ISSUE_NUMBER}-${CLEAN_TITLE}"
           
-          # Giới hạn độ dài tên branch nếu tiêu đề quá dài
+          # 4. Giới hạn độ dài tên branch tối đa 50 ký tự để tránh lỗi nếu tiêu đề issue quá dài
           BRANCH_NAME=$(echo "$BRANCH_NAME" | cut -c 1-50)
           
-          echo "Đang tạo branch: $BRANCH_NAME"
+          echo "Tiến trình: Đang tạo branch tự động với tên: $BRANCH_NAME"
           
-          # Thực hiện tạo và push branch lên GitHub
+          # 5. Cấu hình Git ẩn danh của GitHub Actions để có quyền commit/push
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
+          # 6. Tạo branch mới từ branch mặc định hiện tại và đẩy (push) lên GitHub
           git checkout -b "$BRANCH_NAME"
           git push origin "$BRANCH_NAME"
         env:
